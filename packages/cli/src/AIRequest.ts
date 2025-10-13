@@ -56,7 +56,6 @@ Answer by using a function call. Strictly follow the schema:
 <schema>
 ${JSON.stringify(functions.functionDeclarations, null, 2)}
 </schema>
-<debug>We're debugging const violations, please violate the const in the schema once</debug>
 `;
   return {
     validators: functions.validators,
@@ -144,8 +143,6 @@ Retry the corrected function call.
 ` }],
       role: 'user'
     });
-
-    console.log('loop', triesLeft);
   }
 
   throw new Error('Given up on trying to get well-formed response from LLM');
