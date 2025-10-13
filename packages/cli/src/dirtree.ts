@@ -14,7 +14,7 @@ function dirtreeDown(state: DirtreeState, entry: FSEntry, isLast: boolean): unde
   }
 
   const omit = state.omitter(entry.rpath);
-  const name = basename(entry.rpath);
+  const name = `${basename(entry.rpath)}${entry.type === 'directory' ? '/' : ''}`;
 
   let annotation = entry.type === 'file' && entry.binary ? ' [binary]' : '';
   if (omit) {

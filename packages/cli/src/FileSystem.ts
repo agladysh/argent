@@ -1,8 +1,9 @@
-import { readdirSync } from 'fs';
+import { readdirSync, readFileSync } from 'fs';
 import { isBinary } from 'istextorbinary';
 import { join, relative } from 'path/posix';
 
 interface FSEntryBase {
+  readonly path: string;
   readonly rpath: string;
   readonly type: 'file' | 'directory';
 }
@@ -30,11 +31,19 @@ export class FileSystem {
   constructor(projectRootPath: string, ignorer: Filter) {
     this.projectRootPath = projectRootPath;
     this.root = {
+      path: this.projectRootPath,
       rpath: './',
       type: 'directory',
       entries: this.scan(this.projectRootPath, ignorer), // Fills this.files as a side-effect.
     };
     this.files.sort((a, b) => a.rpath.localeCompare(b.rpath));
+  }
+
+  readFile(entry: FSEntryFile): string {
+    if (entry.binary) {
+      return '(binary)';
+    }
+    return readFileSync(entry.path, 'utf-8');
   }
 
   walk<T = undefined>(state: T, down: Walker<T, undefined | 'break'>, up: Walker<T, void>): T {
@@ -87,7 +96,8 @@ export class FileSystem {
       // TODO: Make sure symlinks are handled properly with this logic.
       if (entry.isDirectory()) {
         result.push({
-          rpath: rpath,
+          path,
+          rpath,
           type: 'directory',
           entries: this.scan(path, ignorer),
         } satisfies FSEntryDir);
@@ -95,6 +105,7 @@ export class FileSystem {
       }
 
       const file: FSEntryFile = {
+        path,
         rpath,
         type: 'file',
         binary: !!isBinary(path),
