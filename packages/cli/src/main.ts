@@ -70,7 +70,7 @@ function idToTitle(id: string): string {
 function valueToMarkdown(value: Json): string {
   const type = typeof value;
   if (type === 'string' || type === 'number') {
-    return String(type);
+    return String(value);
   }
   return '```yaml\n' + yaml.stringify(value) + '```';
 }
@@ -144,6 +144,7 @@ ${value}
 
   const role = context('Role', 'role', roleResponse.role);
 
+  console.log('');
   console.log(role.value);
 
   const standardResponse = (await requestAI({
@@ -164,7 +165,10 @@ ${value}
   const standard = context('Standard', 'standard', standardResponse.standard);
   const methodology = context('Methodology', 'methodology', standardResponse.methodology);
 
+  console.log('');
   console.log(standard.value);
+
+  console.log('');
   console.log(methodology.value);
 
   const patterns = (await requestAI({
@@ -179,11 +183,13 @@ ${value}
     ],
   })) as { patterns: string[] };
 
+  console.log('');
   console.log('Reviewing Files:', patterns.patterns);
 
   const matchers = patterns.patterns.map((p) => minimatch.filter(p));
   const omitter = (f: string) => default_omitter.ignores(f) || !matchers.some((m) => m(f));
 
+  console.log('');
   console.log(dirtree(omitter).value);
 
   const response = (await requestAI({
@@ -218,6 +224,7 @@ ${value}
     ],
   })) as JsonObject;
 
+  console.log('');
   console.log(responseToMarkdown(response));
 }
 
