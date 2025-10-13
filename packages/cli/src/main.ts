@@ -37,10 +37,7 @@ node_modules/
 
   const query: AIRequest = {
     query: { value: 'Say hello to my little friend' },
-    context: [
-      { value: 'Mention roses in your reply' },
-      { value: `<dirtree>${dirtree}</dirtree>` }
-    ],
+    context: [{ value: 'Mention roses in your reply' }, { value: `<dirtree>${dirtree}</dirtree>` }],
     select: [
       {
         answer: '"Hello, little friend!"',
@@ -48,7 +45,7 @@ node_modules/
       },
       {
         answer: '"That is an interesting dirtree you have there."',
-        remarks: 'string > 0'
+        remarks: 'string > 0',
       },
     ],
   } as const;

@@ -2,9 +2,9 @@ import { basename } from 'path/posix';
 import type { FSEntry, FileSystem, Filter } from './FileSystem.ts';
 
 export interface DirtreeState {
-  lines: string[],
-  prefix: string[],
-  omitter: Filter,
+  lines: string[];
+  prefix: string[];
+  omitter: Filter;
 }
 
 function dirtreeDown(state: DirtreeState, entry: FSEntry, isLast: boolean): undefined | 'break' {
@@ -16,7 +16,7 @@ function dirtreeDown(state: DirtreeState, entry: FSEntry, isLast: boolean): unde
   const omit = state.omitter(entry.rpath);
   const name = basename(entry.rpath);
 
-  let annotation = (entry.type === 'file' && entry.binary) ? ' [binary]' : '';
+  let annotation = entry.type === 'file' && entry.binary ? ' [binary]' : '';
   if (omit) {
     annotation = ' [omitted]';
   }
@@ -40,7 +40,7 @@ export function renderDirtree(fs: FileSystem, omitter: Filter): string {
   const state: DirtreeState = {
     lines: [],
     prefix: [''],
-    omitter
+    omitter,
   };
   return fs.walk(state, dirtreeDown, dirtreeUp).lines.join('\n');
 }

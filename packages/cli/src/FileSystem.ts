@@ -37,11 +37,7 @@ export class FileSystem {
     this.files.sort((a, b) => a.rpath.localeCompare(b.rpath));
   }
 
-  walk<T = undefined>(
-    state: T,
-    down: Walker<T, undefined | 'break'>,
-    up: Walker<T, void>
-  ): T {
+  walk<T = undefined>(state: T, down: Walker<T, undefined | 'break'>, up: Walker<T, void>): T {
     return this.walkImpl(state, down, up, this.root, true);
   }
 
@@ -58,7 +54,7 @@ export class FileSystem {
 
     for (let i = 0; i < root.entries.length; ++i) {
       const entry = root.entries[i];
-      const lastEntry = (i === root.entries.length - 1);
+      const lastEntry = i === root.entries.length - 1;
       if (entry.type === 'directory') {
         this.walkImpl(state, down, up, entry, lastEntry);
         continue;
@@ -93,7 +89,7 @@ export class FileSystem {
         result.push({
           rpath: rpath,
           type: 'directory',
-          entries: this.scan(path, ignorer)
+          entries: this.scan(path, ignorer),
         } satisfies FSEntryDir);
         continue;
       }

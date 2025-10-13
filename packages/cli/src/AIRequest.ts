@@ -1,25 +1,37 @@
 import type { JsonObject } from '@ark/util';
-import { type FunctionDeclaration, type GenerateContentParameters, FunctionCallingConfigMode, type GenerateContentResponse, GoogleGenAI } from '@google/genai';
+import {
+  type FunctionDeclaration,
+  type GenerateContentParameters,
+  FunctionCallingConfigMode,
+  type GenerateContentResponse,
+  GoogleGenAI,
+} from '@google/genai';
 import { type Type, type, ArkErrors } from 'arktype';
 
 interface AIQuery {
   value: string;
 }
+
 interface AIContext {
   value: string;
 }
+
 type AISelect = JsonObject;
+
 export interface AIRequest {
   query: AIQuery;
   context: AIContext[];
   select: AISelect[];
 }
+
 type AIResponseValidators = Record<string, Type>;
+
 interface AIRequestFunctions {
   functionDeclarations: FunctionDeclaration[];
   allowedFunctionNames: string[];
   validators: AIResponseValidators;
 }
+
 function buildFunctionDeclarations(data: AISelect[]): AIRequestFunctions {
   const result: AIRequestFunctions = {
     functionDeclarations: [],
@@ -32,7 +44,7 @@ function buildFunctionDeclarations(data: AISelect[]): AIRequestFunctions {
     const validator = type(data[i]);
     result.functionDeclarations.push({
       name,
-      parametersJsonSchema: validator.toJsonSchema()
+      parametersJsonSchema: validator.toJsonSchema(),
     });
     result.allowedFunctionNames.push(name);
     result.validators[name] = validator;
@@ -40,11 +52,12 @@ function buildFunctionDeclarations(data: AISelect[]): AIRequestFunctions {
 
   return result;
 }
+
 interface AIRequestParameters {
   request: GenerateContentParameters;
   validators: AIResponseValidators;
 }
-;
+
 function buildAIRequestParameters({ query, context, select }: AIRequest): AIRequestParameters {
   const functions = buildFunctionDeclarations(select);
   const system = context.map((c) => c.value).join('\n');
@@ -65,7 +78,7 @@ ${JSON.stringify(functions.functionDeclarations, null, 2)}
         {
           parts: [{ text: user }],
           role: 'user',
-        }
+        },
       ],
       config: {
         systemInstruction: system,
@@ -78,14 +91,15 @@ ${JSON.stringify(functions.functionDeclarations, null, 2)}
         tools: [{ functionDeclarations: functions.functionDeclarations }],
         temperature: 0,
       },
-    }
+    },
   };
 }
+
 interface AIResponse {
   name: string;
   args: Record<string, unknown>;
 }
-;
+
 function extractAIResponse(response: GenerateContentResponse): AIResponse {
   const { name, args } = ((response?.candidates ?? [])[0]?.content?.parts ?? [])[0].functionCall ?? {};
   if (!args || !name) {
@@ -95,6 +109,7 @@ function extractAIResponse(response: GenerateContentResponse): AIResponse {
 
   return { name, args };
 }
+
 // TODO: This should lift result type union from Type.
 export async function requestAI(input: AIRequest) {
   const params = buildAIRequestParameters(input);
@@ -111,7 +126,9 @@ export async function requestAI(input: AIRequest) {
   while (triesLeft-- > 0) {
     const { name, args } = extractAIResponse(await ai.models.generateContent(request));
     if (!(name in params.validators)) {
-      throw new Error(`LLM responded with unknown tool call ${name}, known are ${Object.keys(params.validators).join(', ')}`);
+      throw new Error(
+        `LLM responded with unknown tool call ${name}, known are ${Object.keys(params.validators).join(', ')}`
+      );
     }
 
     const validated = params.validators[name](args);
@@ -125,12 +142,15 @@ export async function requestAI(input: AIRequest) {
       throw new Error('unreachable'); // Guard to make TS happy
     }
 
-    request.contents.push({
-      parts: [{ functionCall: { name, args } }],
-      role: 'model'
-    }, {
-      parts: [{
-        text: `
+    request.contents.push(
+      {
+        parts: [{ functionCall: { name, args } }],
+        role: 'model',
+      },
+      {
+        parts: [
+          {
+            text: `
 "${name}" function call you made above violates the provided schema:
 <error>
 ${validated.summary}
@@ -140,9 +160,12 @@ Correct the function call by strictly adhering to the schema:
 ${JSON.stringify(params.validators[name].toJsonSchema(), null, 0)}
 </schema>
 Retry the corrected function call.
-` }],
-      role: 'user'
-    });
+`,
+          },
+        ],
+        role: 'user',
+      }
+    );
   }
 
   throw new Error('Given up on trying to get well-formed response from LLM');
