@@ -1,6 +1,5 @@
 #! /usr/bin/env node --env-file-if-exists=.env --experimental-strip-types --disable-warning=ExperimentalWarning
 
-import type { JsonObject } from '@ark/util';
 import ignore from 'ignore';
 import { minimatch } from 'minimatch';
 import { requestAI } from './AIRequest.ts';
@@ -113,7 +112,7 @@ ${value}
   console.log('');
   console.log(dirtree(omitter).value);
 
-  const response = (await requestAI({
+  const response = await requestAI({
     query: { value: 'Execute the task adhering to the standard and methodology' },
     context: [role, task, standard, methodology, dirtree(omitter), files(omitter)],
     select: [
@@ -143,7 +142,7 @@ ${value}
         'remarks?': 'string > 0',
       },
     ],
-  })) as JsonObject;
+  });
 
   console.log('');
   console.log(responseToMarkdown(response));

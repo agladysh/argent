@@ -111,7 +111,7 @@ function extractAIResponse(response: GenerateContentResponse): AIResponse {
 }
 
 // TODO: This should lift result type union from Type.
-export async function requestAI(input: AIRequest) {
+export async function requestAI(input: AIRequest): Promise<JsonObject> {
   const params = buildAIRequestParameters(input);
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
   if (!GEMINI_API_KEY) {
@@ -133,7 +133,7 @@ export async function requestAI(input: AIRequest) {
 
     const validated = params.validators[name](args);
     if (!(validated instanceof ArkErrors)) {
-      return validated;
+      return validated as JsonObject;
     }
 
     console.warn('LLM returned malformed response:', validated.summary);
