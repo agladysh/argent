@@ -15,6 +15,7 @@ export function findProjectRootPath(cwdPath: string): string {
 
   return findProjectRootPath(join(cwdPath, '../'));
 }
+
 export function readGitIgnore(projectRootPath: string) {
   // TODO: Strictly speaking, Git may have more ignores configured.
   const path = join(projectRootPath, '.gitignore');

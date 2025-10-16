@@ -8,11 +8,11 @@ import {
 } from '@google/genai';
 import { type Type, type, ArkErrors } from 'arktype';
 
-interface AIQuery {
+export interface AIQuery {
   value: string;
 }
 
-interface AIContext {
+export interface AIContext {
   value: string;
 }
 

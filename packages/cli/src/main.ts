@@ -2,14 +2,14 @@
 
 import ignore from 'ignore';
 import { minimatch } from 'minimatch';
-import { requestAI } from './AIRequest.ts';
+import { type AIContext, requestAI } from './AIRequest.ts';
 import { renderDirtree } from './dirtree.ts';
 import { FileSystem, type Filter } from './FileSystem.ts';
 import { findProjectRootPath, readGitIgnore } from './project.ts';
 import { formatFiles, responseToMarkdown } from './util/string.ts';
 
-async function main(): Promise<void> {
-  const projectRootPath = findProjectRootPath(process.cwd());
+function setupFS(cwdPath: string): FileSystem {
+  const projectRootPath = findProjectRootPath(cwdPath);
   console.log('Project root', projectRootPath);
 
   const alwaysIgnore = `
@@ -21,29 +21,42 @@ node_modules/
   const ignorer = ignore();
   ignorer.add(alwaysIgnore);
 
-  const fs = new FileSystem(projectRootPath, (path: string) => ignorer.ignores(path));
+  return new FileSystem(projectRootPath, (path: string) => ignorer.ignores(path));
+}
 
-  console.log(`Discovered ${fs.files.length} non-ignored project files`);
-
+function setupDefaultOmitter(fs: FileSystem): ignore.Ignore {
   const alwaysOmit = `
 .env
   `.trim();
 
-  const default_omitter = ignore();
-  default_omitter.add(alwaysOmit);
-  default_omitter.add(readGitIgnore(projectRootPath));
+  const defaultOmitter = ignore();
+  defaultOmitter.add(alwaysOmit);
+  defaultOmitter.add(readGitIgnore(fs.projectRootPath));
 
-  const context = (header: string, tag: string, value: string) => ({
+  return defaultOmitter;
+}
+
+function context(header: string, tag: string, value: string): AIContext {
+  return {
     value: `
 # ${header}
 
 <${tag}>
 ${value}
 </${tag}>
-  `.trim(),
-  });
+    `.trim(),
+  };
+}
+
+async function main(): Promise<void> {
+  const fs = setupFS(process.cwd());
+  const defaultOmitter = setupDefaultOmitter(fs);
+
+  console.log(`Discovered ${fs.files.length} non-ignored project files`);
 
   const dirtree = (omitter: Filter) => context('Project Dirtree', 'dirtree', renderDirtree(fs, omitter));
+  const dirtreeIg = (ig: ignore.Ignore) => dirtree((f) => ig.ignores(f));
+  const defaultDirtree = dirtreeIg(defaultOmitter);
   const files = (omitter: Filter) => context('Relevant Files', 'files', formatFiles(fs, omitter));
 
   const task = context('Task', 'task', 'Review the project security measures against supply chain attacks');
@@ -52,7 +65,7 @@ ${value}
 
   const roleResponse = (await requestAI({
     query: { value: `Determine the AI role suitable for the task execution on this project` },
-    context: [task, dirtree((f) => default_omitter.ignores(f))],
+    context: [task, dirtree((f) => defaultOmitter.ignores(f))],
     select: [
       {
         answer: '"Role suitable for the task execution on this project"',
@@ -71,7 +84,7 @@ ${value}
     query: {
       value: `Return brief standard and brief methodology on how the AI should execute the task on this project`,
     },
-    context: [role, task, dirtree((f) => default_omitter.ignores(f))],
+    context: [role, task, defaultDirtree],
     select: [
       {
         answer: '"Standard and methodology on how the AI should execute the task"',
@@ -93,7 +106,7 @@ ${value}
 
   const patterns = (await requestAI({
     query: { value: `Return minimatch patterns identifying files in this project, relevant to the task` },
-    context: [role, task, standard, methodology, dirtree((f) => default_omitter.ignores(f))],
+    context: [role, task, standard, methodology, defaultDirtree],
     select: [
       {
         answer: '"Minimatch patterns identifying files relevant to the task"',
@@ -107,7 +120,7 @@ ${value}
   console.log('Reviewing Files:', patterns.patterns);
 
   const matchers = patterns.patterns.map((p) => minimatch.filter(p));
-  const omitter = (f: string) => default_omitter.ignores(f) || !matchers.some((m) => m(f));
+  const omitter = (f: string) => defaultOmitter.ignores(f) || !matchers.some((m) => m(f));
 
   console.log('');
   console.log(dirtree(omitter).value);
