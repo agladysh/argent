@@ -7,6 +7,7 @@ import { renderDirtree } from './dirtree.ts';
 import { FileSystem, type Filter } from './FileSystem.ts';
 import { findProjectRootPath, readGitIgnore } from './project.ts';
 import { formatFiles, responseToMarkdown } from './util/string.ts';
+import { $ } from 'execa';
 
 function setupFS(cwdPath: string): FileSystem {
   const projectRootPath = findProjectRootPath(cwdPath);
@@ -59,14 +60,16 @@ async function main(): Promise<void> {
 
   console.log(`Discovered ${fs.files.length} non-ignored project files`);
 
-  const review = async (taskText: string): Promise<string> => {
+  // TODO: Add a command to run this.
+  // TODO: Cumbersome. Refactor away unused abstractions and streamline.
+  const _review = async (taskText: string): Promise<string> => {
     const task = context('Task', 'task', taskText);
 
     console.log(task.value);
 
     const roleResponse = (await requestAI({
       query: { value: `Determine the AI role suitable for the task execution on this project` },
-      context: [task, dirtree((f) => defaultOmitter.ignores(f))],
+      context: [task, defaultDirtree],
       select: [
         {
           answer: '"Role suitable for the task execution on this project"',
@@ -161,8 +164,75 @@ async function main(): Promise<void> {
     return responseToMarkdown(response);
   };
 
+//  console.log('');
+//  console.log(await review('Review the project security measures against supply chain attacks'));
+  const taskText = 'Review the Project adherence to OpenSpec process in letter and spirit';
+
+  const task = context('Task', 'task', taskText);
+
+  console.log(task.value);
+
+  // TODO: dirtree excludes 'openspec/**/*.md' (no match on openspec/) without partial, it should not
+  const matchers = ['openspec/**/*.md'].map((p) => minimatch.filter(p));
+  const omitter = (f: string) => defaultOmitter.ignores(f) || !matchers.some((m) => m(f));
+
+  const matchersDirtree = ['openspec/**/*.md'].map((p) => minimatch.filter(p, { partial: true }));
+  const omitterDirtree = (f: string) => defaultOmitter.ignores(f) || !matchersDirtree.some((m) => m(f));
+
+  const $$ = $({ cwd: fs.projectRootPath });
+
+  const gitStatus = context('Git Status', 'git-status', (await $$`git status -sbu`).stdout);
+  const gitLog = context('Last 10 Git Log Entries for openspec/', 'git-log', (await $$`git log --name-status --max-count 10 -- openspec/`).stdout);
+
+  const projectDirtree = dirtree(omitterDirtree);
+  const projectFiles = files(omitter);
+
+  console.log(projectDirtree.value);
+  console.log(gitStatus.value);
+  console.log(gitLog.value);
+
+  const ctx = [task, projectDirtree, gitStatus, gitLog, projectFiles];
+
+  const roleResponse = (await requestAI({
+    query: { value: `Determine the AI role suitable for the task execution on this project. It should be a position profile that LLM understands well from its general knowledge, not project context.` },
+    context: ctx,
+    select: [
+      {
+        answer: '"Role suitable for the task execution on this project"',
+        role: 'string > 0',
+        remarks: 'string > 0',
+      },
+    ],
+  })) as { role: string };
+
+  const role = context('Role', 'role', roleResponse.role);
+
   console.log('');
-  console.log(await review('Review the project security measures against supply chain attacks'));
+  console.log(role.value);
+
+  const standardResponse = (await requestAI({
+    query: {
+      value: `Return brief standard and brief methodology on how the AI should execute the task on this project`,
+    },
+    context: [role, ...ctx],
+    select: [
+      {
+        answer: '"Standard and methodology on how the AI should execute the task"',
+        standard: 'string > 0',
+        methodology: 'string > 0',
+        remarks: 'string > 0',
+      },
+    ],
+  })) as { standard: string; methodology: string };
+
+  const standard = context('Standard', 'standard', standardResponse.standard);
+  const methodology = context('Methodology', 'methodology', standardResponse.methodology);
+
+  console.log('');
+  console.log(standard.value);
+
+  console.log('');
+  console.log(methodology.value);
 }
 
 void main().catch((error: unknown) => {
