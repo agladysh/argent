@@ -1,12 +1,14 @@
 import type { JsonObject } from '@ark/util';
 import {
+  ApiError,
+  FunctionCallingConfigMode,
   type FunctionDeclaration,
   type GenerateContentParameters,
-  FunctionCallingConfigMode,
   type GenerateContentResponse,
   GoogleGenAI,
 } from '@google/genai';
-import { type Type, type, ArkErrors } from 'arktype';
+import { ArkErrors, type Type, type } from 'arktype';
+import { setTimeout } from 'node:timers/promises';
 
 export interface AIQuery {
   value: string;
@@ -110,6 +112,42 @@ function extractAIResponse(response: GenerateContentResponse): AIResponse {
   return { name, args };
 }
 
+interface RetryOptions {
+  maxRetries: number;
+}
+
+const DEFAULT_RETRY_OPTIONS: RetryOptions = {
+  maxRetries: 5,
+};
+
+async function generateContent(
+  ai: GoogleGenAI,
+  request: GenerateContentParameters,
+  options: Partial<RetryOptions> = {}
+): Promise<GenerateContentResponse> {
+  const opts: RetryOptions = { ...DEFAULT_RETRY_OPTIONS, ...options };
+  if (opts.maxRetries <= 0) {
+    throw new Error('generateContent: no retries left');
+  }
+
+  try {
+    return await ai.models.generateContent(request);
+  } catch (e: unknown) {
+    console.error('generateContent', String(e));
+    console.log(JSON.stringify(e));
+    if (!(e instanceof ApiError)) {
+      throw e;
+    }
+    if (e.status === 503) {
+      const delay = 10 * 1000;
+      console.log(`generateContent: got 503, retrying in ${delay / 1000}s`);
+      await setTimeout(delay); // TODO: Exponential backoff
+      return generateContent(ai, request, { ...opts, maxRetries: opts.maxRetries - 1 });
+    }
+    throw e;
+  }
+}
+
 // TODO: This should lift result type union from Type.
 export async function requestAI(input: AIRequest): Promise<JsonObject> {
   const params = buildAIRequestParameters(input);
@@ -124,7 +162,7 @@ export async function requestAI(input: AIRequest): Promise<JsonObject> {
 
   let triesLeft = 2;
   while (triesLeft-- > 0) {
-    const { name, args } = extractAIResponse(await ai.models.generateContent(request));
+    const { name, args } = extractAIResponse(await generateContent(ai, request));
     if (!(name in params.validators)) {
       throw new Error(
         `LLM responded with unknown tool call ${name}, known are ${Object.keys(params.validators).join(', ')}`
