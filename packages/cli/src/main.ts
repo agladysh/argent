@@ -164,8 +164,8 @@ async function main(): Promise<void> {
     return responseToMarkdown(response);
   };
 
-//  console.log('');
-//  console.log(await review('Review the project security measures against supply chain attacks'));
+  //  console.log('');
+  //  console.log(await review('Review the project security measures against supply chain attacks'));
   const taskText = 'Review the Project adherence to OpenSpec process in letter and spirit';
 
   const task = context('Task', 'task', taskText);
@@ -182,7 +182,11 @@ async function main(): Promise<void> {
   const $$ = $({ cwd: fs.projectRootPath });
 
   const gitStatus = context('Git Status', 'git-status', (await $$`git status -sbu`).stdout);
-  const gitLog = context('Last 10 Git Log Entries for openspec/', 'git-log', (await $$`git log --name-status --max-count 10 -- openspec/`).stdout);
+  const gitLog = context(
+    'Last 10 Git Log Entries for openspec/',
+    'git-log',
+    (await $$`git log --name-status --max-count 10 -- openspec/`).stdout
+  );
 
   const projectDirtree = dirtree(omitterDirtree);
   const projectFiles = files(omitter);
@@ -194,7 +198,7 @@ async function main(): Promise<void> {
   const ctx = [task, projectDirtree, gitStatus, gitLog, projectFiles];
 
   const roleResponse = (await requestAI({
-    query: { value: `Determine the AI role suitable for the task execution on this project. It should be a position profile that LLM understands well from its general knowledge, not project context.` },
+    query: { value: `Determine the LLM role (personality) suitable for the task execution on this project.` },
     context: ctx,
     select: [
       {
