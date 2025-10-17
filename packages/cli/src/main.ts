@@ -193,7 +193,6 @@ async function main(): Promise<void> {
 
   console.log(projectDirtree.value);
   console.log(gitStatus.value);
-  console.log(gitLog.value);
 
   const ctx = [task, projectDirtree, gitStatus, gitLog, projectFiles];
 
@@ -237,6 +236,41 @@ async function main(): Promise<void> {
 
   console.log('');
   console.log(methodology.value);
+
+  const response = await requestAI({
+    query: { value: 'Execute the task adhering to the standard and methodology' },
+    context: [role, ...ctx, standard, methodology],
+    select: [
+      {
+        answer: '"Project entirely satisfies the standard"',
+        analysis: 'string > 0',
+        'remarks?': 'string > 0',
+      },
+      {
+        answer: '"Project satisfies the standard with areas for improvement"',
+        analysis: 'string > 0',
+        managerialRecommendations: 'string > 0',
+        technicalRecommendations: 'string > 0',
+        'remarks?': 'string > 0',
+      },
+      {
+        answer: '"Project does not satisfy the standard"',
+        analysis: 'string > 0',
+        managerialRecommendations: 'string > 0',
+        technicalRecommendations: 'string > 0',
+        'remarks?': 'string > 0',
+      },
+      {
+        answer: '"Uncertain, or Not sufficient information, or Unable to answer"',
+        analysis: 'string > 0',
+        requestForClarification: 'string > 0',
+        'remarks?': 'string > 0',
+      },
+    ],
+  });
+
+  console.log('');
+  console.log(responseToMarkdown(response));
 }
 
 void main().catch((error: unknown) => {
